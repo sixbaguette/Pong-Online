@@ -106,5 +106,13 @@ public class BallServer : NetworkBehaviour
         if (pad == null) return;
 
         if (Mathf.Sign(direction.x) != side) return;
+
+        var paddleView = pad.GetComponent<PaddleView>();
+        Transform padVis = paddleView != null ? paddleView.GetVisual() : null;
+
+        Vector2 pCenter = pad.position;
+        Vector2 pHalf = paddleHalfSize;
+
+        var paddleSpriteRenderer = padVis != null ? padVis.GetComponent<SpriteRenderer>() : null;
     }
 }
