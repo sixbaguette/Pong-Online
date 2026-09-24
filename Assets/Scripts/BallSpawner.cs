@@ -32,6 +32,20 @@ public class BallSpawner : NetworkBehaviour
 
         NetworkObject ball = Instantiate(ballPrefab, Vector3.zero, Quaternion.identity);
 
+        var ballServer = ball.GetComponent<BallServer>();
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+        {
+            Transform paddle = client.PlayerObject != null ? client.PlayerObject.transform : null;
+
+            if (paddle == null) continue;
+
+            if (paddle.position.x < 0f) ballServer.LeftPaddle = paddle;
+            else ballServer.RightPaddle = paddle;
+        }
+
         ball.Spawn();
+
+        m_ballSpawn = true;
     }
 }
