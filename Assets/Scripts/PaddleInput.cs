@@ -83,8 +83,7 @@ public class PaddleInput : NetworkBehaviour
 
     private float ReadVerticalIntent()
     {
-        // mettre input
-
+        // clavier
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null) return 0f;
 
@@ -97,6 +96,20 @@ public class PaddleInput : NetworkBehaviour
         if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
         {
             direction -= 1f;
+        }
+
+        // manette
+        Gamepad gamepad = Gamepad.current;
+        if (gamepad != null)
+        {
+            float stickY = gamepad.leftStick.y.ReadValue();
+            if (Mathf.Abs(stickY) > 0.2f)
+            {
+                direction += stickY;
+            }
+
+            if (gamepad.dpad.up.isPressed) direction += 1f;
+            if (gamepad.dpad.down.isPressed) direction -= 1f;
         }
 
 

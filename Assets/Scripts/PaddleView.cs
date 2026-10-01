@@ -18,6 +18,19 @@ public class PaddleView : NetworkBehaviour
         if (target == null) target = transform.Find("Visual");
 
         target.SetParent(null);
+
+        ApplyColor();
+    }
+
+    private void ApplyColor()
+    {
+        if (target == null) return;
+
+        SpriteRenderer sr = target.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            sr.color = transform.position.x < 0f ? Color.blue : Color.red;
+        }
     }
 
     public override void OnNetworkDespawn()

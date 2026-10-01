@@ -3,7 +3,11 @@ using UnityEngine;
 
 public class BallServer : NetworkBehaviour
 {
-    [SerializeField] private float speed = 5.0f;
+    [Header("Vitesse & Accélération")]
+    [SerializeField] private float baseSpeed = 5.0f;
+    [SerializeField] private float speedIncrement = 0.5f;
+    [SerializeField] private float maxSpeed = 15.0f;
+
     [SerializeField] private Transform visual;
 
     [Header("Arène")]
@@ -24,17 +28,25 @@ public class BallServer : NetworkBehaviour
     [SerializeField] private float minBounceX = 0.45f;
 
     private float lastHitTime;
-
     private Vector2 direction = Vector2.right;
 
     public NetworkVariable<Vector2> NetPos = new NetworkVariable<Vector2>(Vector2.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public NetworkVariable<Vector2> NetDirection = new NetworkVariable<Vector2>(
-        Vector2.right, 
-        NetworkVariableReadPermission.Everyone, 
+        Vector2.right,
+        NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
-    public float Speed => speed;
+    public NetworkVariable<float> NetSpeed = new NetworkVariable<float>(
+        5.0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    // Score
+    public NetworkVariable<int> ScoreLeft = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int> ScoreRight = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    public float Speed => NetSpeed.Value;
     public float YMax => yMax;
     public float YMin => yMin;
     public float XMax => xMax;
@@ -53,7 +65,16 @@ public class BallServer : NetworkBehaviour
 
         if (!IsServer) return;
 
+        ResetBall(1f);
+    }
+
+    private void ResetBall(float dirX)
+    {
         transform.position = Vector3.zero;
+        direction = new Vector2(dirX, Random.Range(-0.5f, 0.5f)).normalized;
+
+        NetSpeed.Value = baseSpeed;
+
         NetPos.Value = transform.position;
         NetDirection.Value = direction;
     }
@@ -71,10 +92,7 @@ public class BallServer : NetworkBehaviour
         ballHalf = new Vector2(0.125f, 0.125f);
     }
 
-    private void MesurePaddle()
-    {
-
-    }
+    private void MesurePaddle() { }
 
     private void Update()
     {
@@ -86,11 +104,10 @@ public class BallServer : NetworkBehaviour
     private void GetWall()
     {
         Vector2 p = transform.position;
-        p += direction * speed * Time.deltaTime;
+        p += direction * NetSpeed.Value * Time.deltaTime;
 
         float top = p.y + ballHalf.y;
         float bottom = p.y - ballHalf.y;
-
 
         if (top > yMax)
         {
@@ -102,22 +119,24 @@ public class BallServer : NetworkBehaviour
             p.y = yMin + ballHalf.y;
             direction.y = Mathf.Abs(direction.y);
         }
-        
-        float right = p.x + ballHalf.x;    
+
+        float right = p.x + ballHalf.x;
         float left = p.x - ballHalf.x;
 
         if (right > xMax)
         {
-            p.x = xMax - ballHalf.x;
-            direction.x = -Mathf.Abs(direction.x);
+            ScoreLeft.Value++;
+            ResetBall(-1f);
+            return;
         }
         else if (left < xMin)
         {
-            p.x = xMin + ballHalf.x;
-            direction.x = Mathf.Abs(direction.x);
+            ScoreRight.Value++;
+            ResetBall(1f);
+            return;
         }
 
-        // paddle
+        // Rebond Paddle
         CollideWithPaddle(ref p, LeftPaddle, -1);
         CollideWithPaddle(ref p, RightPaddle, 1);
 
@@ -159,14 +178,14 @@ public class BallServer : NetworkBehaviour
         float padMinY = padCenter.y - padHalf.y;
         float padMaxY = padCenter.y + padHalf.y;
 
-        bool overlap = ballMinY < padMaxY 
+        bool overlap = ballMinY < padMaxY
             && ballMinX < padMaxX
             && ballMaxY > padMinY
             && ballMaxX > padMinX;
 
         if (!overlap) return;
 
-        // pen test
+        // Test de pénétration
         float penLeft = Mathf.Abs(ballMaxX - padMinX);
         float penRight = Mathf.Abs(ballMinX - padMaxX);
         float penBottom = Mathf.Abs(ballMaxY - padMinY);
@@ -180,12 +199,12 @@ public class BallServer : NetworkBehaviour
         else ballCenter.y = padMaxY + ballHalf.y;
 
         direction.x = -direction.x;
-        float centralDelta = Mathf.Clamp((ballCenter.y - padCenter.y) / padHalf.x, -1f, 1f);
+        float centralDelta = Mathf.Clamp((ballCenter.y - padCenter.y) / padHalf.y, -1f, 1f);
 
         direction.y += centralDelta * spinStrenght;
         direction = direction.normalized;
 
-        if (Mathf.Abs(direction.x) < MinBounceX)
+        if (Mathf.Abs(direction.x) < minBounceX)
         {
             float signX = Mathf.Sign(direction.x);
             if (signX == 0) signX = side > 0 ? 1f : -1f;
@@ -195,6 +214,9 @@ public class BallServer : NetworkBehaviour
             direction = new Vector2(x, y);
             direction = direction.normalized;
         }
+
+        // accel ball
+        NetSpeed.Value = Mathf.Min(NetSpeed.Value + speedIncrement, maxSpeed);
 
         p = ballCenter;
         lastHitTime = Time.time;
